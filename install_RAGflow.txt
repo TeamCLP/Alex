@@ -1,0 +1,536 @@
+================================================================================
+📚 GUIDE D'INSTALLATION DE RAGFLOW DANS JUPYTERLAB (runAI Pod)
+================================================================================
+
+🎯 PRÉREQUIS
+================================================================================
+
+✅ Pod runAI avec JupyterLab actif
+✅ Au moins 16 GB de RAM allouée au pod (32 GB recommandé)
+✅ Au moins 50 GB d'espace disque disponible
+✅ Accès root ou sudo dans le pod (si nécessaire)
+✅ Connexion Internet stable
+
+📝 Pour vérifier les ressources dans JupyterLab:
+   Ouvrir un Terminal dans JupyterLab (File → New → Terminal)
+
+   # Vérifier la RAM disponible
+   free -h
+
+   # Vérifier l'espace disque
+   df -h
+
+   # Vérifier Docker (si disponible)
+   docker --version
+
+
+🔧 ÉTAPE 1: OUVRIR UN TERMINAL DANS JUPYTERLAB
+================================================================================
+
+📱 Dans JupyterLab:
+   1. Cliquer sur File → New → Terminal
+   2. Ou cliquer sur l'icône "Terminal" dans le Launcher
+
+💡 Toutes les commandes ci-dessous doivent être exécutées dans ce terminal
+
+
+🔧 ÉTAPE 2: CLONER LE DÉPÔT RAGFLOW
+================================================================================
+
+📥 Cloner le repository depuis GitHub:
+   git clone https://github.com/infiniflow/ragflow.git
+
+📂 Se déplacer dans le dossier:
+   cd ragflow
+
+📍 Vérifier le contenu:
+   ls -la
+
+
+🚀 ÉTAPE 3: VÉRIFIER DOCKER DANS LE POD
+================================================================================
+
+🐳 Vérifier que Docker est disponible dans le pod:
+   docker --version
+
+🔍 Vérifier que le daemon Docker fonctionne:
+   docker ps
+
+⚠️ Si Docker n'est pas disponible:
+   - Vérifier avec l'admin runAI si Docker-in-Docker est activé pour le pod
+   - Alternative: Demander un pod avec privilèges Docker
+
+📊 Vérifier les ressources Docker disponibles:
+   docker info | grep -E "CPUs|Total Memory"
+
+
+🏗️ ÉTAPE 3: CONFIGURER LES RESSOURCES (IMPORTANT!)
+================================================================================
+
+⚠️ RAGFlow nécessite au moins 16 GB de RAM total
+
+📊 Vérifier la mémoire du pod:
+   free -h
+
+📊 Vérifier l'espace disque:
+   df -h ~
+
+⚠️ Si insuffisant:
+   - Demander à l'admin runAI d'augmenter les ressources du pod
+   - Minimum recommandé: 16 GB RAM, 8 CPU cores, 50 GB disk
+
+
+🎬 ÉTAPE 4: LANCER RAGFLOW AVEC DOCKER COMPOSE
+================================================================================
+
+📂 Se placer dans le dossier docker:
+   cd ~/ragflow/docker
+   # ou si vous avez cloné ailleurs:
+   cd /path/to/ragflow/docker
+
+📝 Vérifier le fichier docker-compose disponible:
+   ls -la docker-compose*.yml
+
+🔧 OPTION A - Pour serveurs runAI standard (x86/amd64):
+   docker compose -f docker-compose.yml up -d
+
+🔧 OPTION B - Pour serveurs runAI avec GPU:
+   # Activer le GPU pour DeepDoc
+   echo "DEVICE=gpu" >> .env
+   docker compose -f docker-compose.yml up -d
+
+🔧 OPTION C - Si l'image pré-construite ne fonctionne pas:
+   # Construire localement (peut prendre 15-30 min)
+   docker compose -f docker-compose.yml build
+   docker compose -f docker-compose.yml up -d
+
+💡 TIP JUPYTERLAB: Vous pouvez créer un notebook pour monitorer le démarrage
+   # Dans une cellule de notebook Python:
+   !docker compose -f docker-compose.yml up -d
+
+
+⏱️ ÉTAPE 5: ATTENDRE LE DÉMARRAGE COMPLET
+================================================================================
+
+📊 Vérifier l'état des conteneurs (dans le Terminal):
+   docker ps
+
+✅ Vous devriez voir 5 conteneurs en cours d'exécution:
+   - ragflow-server (ou ragflow-cpu ou docker-ragflow-cpu-1)
+   - elasticsearch (es01 ou docker-es01-1)
+   - mysql (docker-mysql-1)
+   - redis (docker-redis-1)
+   - minio (docker-minio-1)
+
+📋 Suivre les logs de RAGFlow:
+   docker logs -f docker-ragflow-cpu-1
+
+⏳ Attendre le message indiquant que RAGFlow est prêt (environ 2-5 minutes)
+
+💡 MONITORING AVEC JUPYTERLAB NOTEBOOK:
+   Créer un nouveau notebook Python et exécuter:
+
+   ```python
+   import subprocess
+   import time
+
+   def check_containers():
+       result = subprocess.run(['docker', 'ps', '--format',
+                               'table {{.Names}}\t{{.Status}}'],
+                              capture_output=True, text=True)
+       print(result.stdout)
+
+   # Vérifier toutes les 10 secondes
+   for i in range(30):
+       print(f"\n🔍 Vérification {i+1}/30")
+       check_containers()
+       time.sleep(10)
+   ```
+
+
+🔍 ÉTAPE 6: VÉRIFIER LA SANTÉ DES SERVICES
+================================================================================
+
+🏥 Vérifier l'état de santé de chaque conteneur:
+   docker ps --format "table {{.Names}}\t{{.Status}}"
+
+✅ Tous les conteneurs doivent afficher "healthy" ou "Up"
+
+📊 Vérifier les logs en cas de problème:
+   docker logs docker-ragflow-server-1
+   docker logs docker-es01-1
+   docker logs docker-mysql-1
+   docker logs docker-redis-1
+   docker logs docker-minio-1
+
+
+🌐 ÉTAPE 7: ACCÉDER À RAGFLOW DEPUIS JUPYTERLAB
+================================================================================
+
+🖥️ OPTION A - Accès via Port Forwarding runAI:
+
+   1️⃣ Dans le terminal du pod:
+      # Vérifier que RAGFlow écoute sur le port 80
+      netstat -tuln | grep :80
+
+   2️⃣ Depuis votre machine locale:
+      # Utiliser kubectl pour faire du port forwarding
+      kubectl port-forward <pod-name> 8080:80 -n <namespace>
+
+   3️⃣ Ouvrir dans votre navigateur:
+      http://localhost:8080
+
+🖥️ OPTION B - Accès direct dans le pod (si disponible):
+
+   URL interne: http://localhost:80
+   ou: http://127.0.0.1:80
+
+   💡 Vous pouvez créer un lien dans JupyterLab:
+      1. Créer un fichier HTML dans JupyterLab
+      2. Ajouter: <a href="http://localhost:80">Ouvrir RAGFlow</a>
+
+🖥️ OPTION C - Via Jupyter Proxy (si configuré):
+
+   /proxy/80/
+
+📡 API RAGFlow:
+   Ports: 9380-9382
+   Accès: http://localhost:9380
+
+🔑 Première connexion:
+   - Suivre les instructions à l'écran pour créer un compte admin
+   - Username par défaut: admin
+   - Créer un mot de passe sécurisé
+
+💡 ASTUCE JUPYTERLAB - Tester l'accès avec Python:
+   ```python
+   import requests
+   try:
+       response = requests.get('http://localhost:80', timeout=5)
+       print(f"✅ RAGFlow accessible! Status: {response.status_code}")
+   except Exception as e:
+       print(f"❌ Erreur: {e}")
+   ```
+
+
+🛠️ COMMANDES UTILES POUR LA GESTION
+================================================================================
+
+🔄 Redémarrer tous les conteneurs:
+   docker compose restart
+
+⏸️ Arrêter tous les conteneurs:
+   docker compose stop
+
+🗑️ Arrêter et supprimer tous les conteneurs:
+   docker compose down
+
+⚠️ Arrêter et supprimer conteneurs + volumes (PERTE DE DONNÉES):
+   docker compose down -v
+
+📊 Voir les logs en temps réel:
+   docker compose logs -f
+
+💾 Voir l'utilisation des volumes:
+   docker volume ls
+
+
+📓 ÉTAPE 8: UTILISER RAGFLOW DANS JUPYTERLAB (NOTEBOOKS)
+================================================================================
+
+🐍 Créer un notebook Python pour interagir avec RAGFlow:
+
+   ```python
+   # Cellule 1: Installation du SDK RAGFlow
+   !pip install ragflow-sdk
+
+   # Cellule 2: Configuration
+   from ragflow import RAGFlow
+
+   # Remplacer par votre URL et API key
+   rag = RAGFlow(api_key="your_api_key", base_url="http://localhost:80")
+
+   # Cellule 3: Test de connexion
+   print("✅ Connecté à RAGFlow!")
+
+   # Cellule 4: Upload d'un document
+   dataset = rag.create_dataset(name="mon_dataset")
+   dataset.upload_file("chemin/vers/fichier.pdf")
+
+   # Cellule 5: Requête
+   response = rag.query("Votre question ici")
+   print(response)
+   ```
+
+📊 Créer un notebook de monitoring:
+
+   ```python
+   # Monitoring des conteneurs Docker
+   import subprocess
+   import pandas as pd
+   from IPython.display import display, clear_output
+   import time
+
+   def get_docker_stats():
+       result = subprocess.run(
+           ['docker', 'stats', '--no-stream', '--format',
+            'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}'],
+           capture_output=True, text=True
+       )
+       return result.stdout
+
+   # Rafraîchir toutes les 5 secondes
+   while True:
+       clear_output(wait=True)
+       print("📊 État des conteneurs RAGFlow\n")
+       print(get_docker_stats())
+       time.sleep(5)
+   ```
+
+
+🐛 DÉPANNAGE - PROBLÈMES COURANTS DANS RUNAI POD
+================================================================================
+
+❌ PROBLÈME: "Elasticsearch is unhealthy"
+   ✅ SOLUTION:
+      - Vérifier la RAM du pod: free -h
+      - Demander plus de RAM à l'admin (minimum 16 GB)
+      - Redémarrer: cd ~/ragflow/docker && docker compose restart
+
+❌ PROBLÈME: "Cannot connect to Docker daemon"
+   ✅ SOLUTION:
+      - Vérifier si Docker est activé dans le pod
+      - Contacter l'admin runAI pour activer Docker-in-Docker
+      - Alternative: Demander un pod avec --privileged flag
+
+❌ PROBLÈME: Conteneur plante avec "exit code 137"
+   ✅ SOLUTION:
+      - Manque de mémoire dans le pod
+      - Demander à l'admin d'augmenter les ressources
+      - Ou arrêter d'autres services dans le pod
+
+❌ PROBLÈME: "Port 80 already in use"
+   ✅ SOLUTION:
+      - Vérifier les processus: netstat -tuln | grep :80
+      - Arrêter le service: kill <pid>
+      - Ou modifier le port dans docker-compose.yml:
+        ports:
+          - "8080:80"  # Utiliser le port 8080 à la place
+
+❌ PROBLÈME: "No space left on device"
+   ✅ SOLUTION:
+      - Vérifier l'espace: df -h
+      - Nettoyer les images Docker: docker system prune -a
+      - Demander plus d'espace disque au pod
+
+❌ PROBLÈME: Impossible d'accéder à RAGFlow depuis l'extérieur
+   ✅ SOLUTION:
+      - Utiliser kubectl port-forward depuis votre machine
+      - Ou demander un Ingress/Service à l'admin runAI
+      - Vérifier les Network Policies du cluster
+
+
+📦 INFORMATIONS SUR LES SERVICES
+================================================================================
+
+🔧 Services déployés par RAGFlow:
+
+1️⃣ RAGFlow Server (Port 80, 443, 9380-9382)
+   - Application principale
+   - Interface web et API
+
+2️⃣ Elasticsearch (Port 1200)
+   - Base de données de recherche vectorielle
+   - Nécessite 2-4 GB RAM minimum
+
+3️⃣ MySQL (Port 5455)
+   - Base de données relationnelle
+   - Stockage des métadonnées
+
+4️⃣ Redis (Port 6379)
+   - Cache en mémoire
+   - Gestion des sessions
+
+5️⃣ MinIO (Port 9000-9001)
+   - Stockage d'objets (S3-compatible)
+   - Stockage des fichiers uploadés
+
+
+💾 PERSISTANCE DES DONNÉES DANS RUNAI POD
+================================================================================
+
+⚠️ IMPORTANT: Les données dans un pod sont éphémères par défaut!
+
+🗂️ Utiliser un PVC (Persistent Volume Claim) pour sauvegarder les données:
+
+   1️⃣ Vérifier les PVC montés:
+      df -h | grep /mnt
+
+   2️⃣ Déplacer les volumes Docker vers un PVC:
+      # Si vous avez un PVC monté sur /mnt/data
+      cd ~/ragflow/docker
+      # Modifier docker-compose.yml pour pointer vers /mnt/data
+
+   3️⃣ Alternative - Créer des volumes nommés:
+      docker volume create --driver local \
+        --opt type=none \
+        --opt o=bind \
+        --opt device=/mnt/data/ragflow \
+        ragflow_data
+
+
+📋 COMMANDES KUBECTL UTILES DEPUIS VOTRE MACHINE LOCALE
+================================================================================
+
+🔍 Lister vos pods runAI:
+   kubectl get pods -n <votre-namespace>
+
+🔌 Port forwarding pour accéder à RAGFlow:
+   kubectl port-forward <pod-name> 8080:80 -n <namespace>
+
+📊 Voir les logs du pod:
+   kubectl logs <pod-name> -n <namespace> --tail=100 -f
+
+💻 Exécuter une commande dans le pod:
+   kubectl exec -it <pod-name> -n <namespace> -- bash
+
+📦 Copier des fichiers vers/depuis le pod:
+   # Vers le pod
+   kubectl cp fichier.txt <pod-name>:/home/jovyan/ -n <namespace>
+
+   # Depuis le pod
+   kubectl cp <pod-name>:/home/jovyan/fichier.txt ./fichier.txt -n <namespace>
+
+
+🔐 SÉCURITÉ - POUR ENVIRONNEMENT DE PRODUCTION RUNAI
+================================================================================
+
+⚠️ Pour un déploiement en production sur runAI:
+
+1️⃣ Modifier les mots de passe par défaut:
+   cd ~/ragflow/docker
+   # Éditer le fichier .env
+   nano .env
+   # Changer: MYSQL_PASSWORD, REDIS_PASSWORD, etc.
+
+2️⃣ Utiliser des Secrets Kubernetes:
+   # Stocker les credentials dans des secrets K8s
+   kubectl create secret generic ragflow-secrets \
+     --from-literal=mysql-password=<password> \
+     -n <namespace>
+
+3️⃣ Configurer HTTPS (via Ingress runAI):
+   # Demander un Ingress à l'admin avec certificat TLS
+
+4️⃣ Limiter l'accès réseau:
+   # Configurer des Network Policies
+   # Autoriser uniquement les pods nécessaires
+
+5️⃣ Backups réguliers:
+   # Créer un CronJob pour sauvegarder les volumes
+   # Ou utiliser Velero pour backup du cluster
+
+6️⃣ Monitoring avec Prometheus/Grafana:
+   # Si disponible dans votre cluster runAI
+   # Créer des dashboards pour monitorer RAGFlow
+
+
+🚀 SCRIPT DE DÉMARRAGE AUTOMATIQUE POUR JUPYTERLAB
+================================================================================
+
+💡 Créer un script pour démarrer RAGFlow automatiquement:
+
+   1️⃣ Créer le fichier ~/start_ragflow.sh:
+      cat > ~/start_ragflow.sh << 'EOF'
+      #!/bin/bash
+      echo "🚀 Démarrage de RAGFlow..."
+      cd ~/ragflow/docker
+      docker compose up -d
+      echo "✅ RAGFlow démarré!"
+      echo "🌐 Accès: http://localhost:80"
+      EOF
+
+   2️⃣ Rendre le script exécutable:
+      chmod +x ~/start_ragflow.sh
+
+   3️⃣ Ajouter au ~/.bashrc pour démarrage automatique:
+      echo "~/start_ragflow.sh" >> ~/.bashrc
+
+   4️⃣ Ou créer un bouton dans JupyterLab:
+      # Créer un fichier start_ragflow.ipynb avec:
+      !~/start_ragflow.sh
+
+
+📚 RESSOURCES SUPPLÉMENTAIRES
+================================================================================
+
+📖 Documentation officielle RAGFlow:
+   https://github.com/infiniflow/ragflow
+
+📖 Documentation runAI:
+   https://docs.run.ai/
+
+🐛 Rapporter des bugs RAGFlow:
+   https://github.com/infiniflow/ragflow/issues
+
+💬 Support communautaire:
+   - GitHub Discussions
+   - Discord RAGFlow
+
+🎓 Tutoriels JupyterLab + RAGFlow:
+   - Créer vos propres notebooks d'interaction
+   - Automatiser les workflows RAG
+   - Intégration avec vos modèles ML
+
+
+📝 CHECKLIST FINALE AVANT DE QUITTER LE POD
+================================================================================
+
+✅ Vérifier que tous les conteneurs sont "healthy":
+   docker ps
+
+✅ Sauvegarder vos données importantes vers un PVC:
+   cp -r ~/ragflow/docker /mnt/data/backup/
+
+✅ Documenter vos configurations personnalisées:
+   # Sauvegarder les .env et configs modifiés
+
+✅ Créer un snapshot du pod (si possible):
+   # Via l'interface runAI ou kubectl
+
+✅ Tester l'accès à RAGFlow:
+   curl http://localhost:80
+
+✅ Arrêter proprement avant de fermer le pod:
+   cd ~/ragflow/docker
+   docker compose down  # Si vous ne voulez pas persister
+   # OU
+   # Laisser tourner si le pod reste actif
+
+
+🎯 RACCOURCIS JUPYTERLAB UTILES
+================================================================================
+
+🔧 Créer des favoris dans JupyterLab:
+
+   1. Terminal → cd ~/ragflow/docker
+   2. Clic droit sur le dossier → Add to Favorites
+
+🔧 Créer des cellules magiques utiles:
+
+   ```python
+   # Dans un notebook, créer des raccourcis
+   %alias ragflow_status docker ps --format 'table {{.Names}}\t{{.Status}}'
+   %alias ragflow_logs docker logs -f docker-ragflow-cpu-1
+   %alias ragflow_restart cd ~/ragflow/docker && docker compose restart
+   ```
+
+
+================================================================================
+✨ FIN DU GUIDE - BONNE INSTALLATION SUR RUNAI! ✨
+================================================================================
+
+📅 Dernière mise à jour: Janvier 2026
+🏷️ Version RAGFlow: 0.23.1+
+🖥️ Environnement: JupyterLab sur runAI Pod
+🐳 Docker-in-Docker requis
